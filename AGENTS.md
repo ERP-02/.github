@@ -25,6 +25,7 @@ Shared instructions for Codex and Claude Code. Repository instructions add local
 - Do not delete persistent data, rewrite shared history or run destructive cleanup without explicit scope.
 
 ## Delivery
+- When the owner invokes the configured multi-repository Ready queue, follow the parent workspace entrypoint (versioned in `workspace/AGENTS.md`) and `standards/ready-issue-workflow.md` in the documentation checkout. That explicit workflow authorizes sequential issue branches, commits, push/PR delivery and its stated Project transitions; it does not authorize merging, issue closure, Done or deployment. Other tasks retain the authorization rules below.
 - Default to an issue branch and PR delivery when that workflow is requested. Explicit instructions to use the current branch, commit only, skip PRs, or work without an issue override that default; do not ask again.
 - Commit only when authorized. Push, PR creation, merge, issue closure and Project status changes require authorization for those actions; a skill does not grant it.
 - Use `Refs #N` when the issue should remain open. Use closing keywords only when automatic closure is intended and authorized.
