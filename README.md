@@ -13,3 +13,7 @@ Sibling repositories explicitly load these rules. GitHub's shared contribution t
 Prefer a sibling checkout for local work; otherwise fetch the public source and resolve shared skill links relative to this repository, not the target service. Local unpushed changes are available only to sessions using that checkout; publish this repository before relying on new remote paths.
 
 Keep internal service designs and private data in `documentation`. The shared rules do not install tools, grant permissions or approve architecture decisions.
+
+## Parent workspace entrypoint
+
+Versioned [workspace AGENTS.md](workspace/AGENTS.md) and [Claude adapter](workspace/CLAUDE.md) provide the sibling-repository map and the owner-configured single-agent Ready queue. Copy them to the parent workspace without overwriting existing files; see `documentation/standards/ready-issue-workflow.md` in the local architecture checkout for setup and live Project/dependency handling. The parent folder does not become a monorepo.
