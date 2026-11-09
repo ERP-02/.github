@@ -1,5 +1,5 @@
 name: Task
-about: Implementation task with clear agent boundaries
+description: Implementation task with clear agent boundaries
 title: "[TASK] "
 labels: ["type:task"]
 body:
