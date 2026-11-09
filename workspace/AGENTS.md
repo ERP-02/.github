@@ -30,7 +30,7 @@ The owner configured this workspace for a single-agent GitHub issue queue. When 
 
 The configured delivery is one new issue branch and one PR per issue in its owning repository, based on current `master` after checking local changes. Commit the scoped implementation, push the branch and create a `master`-targeted PR with `Refs #N`. This is the owner's standing delivery preference for the invoked queue; later explicit user directions override it.
 
-Project transitions for queue work are `Ready` → `In Progress` → `In Review`. Use `In Review` only after required checks and a concrete PR exist. No automatic PR merge, issue closure, `Done`, production deployment, credential provisioning or destructive cleanup is authorized by the Ready request.
+Project transitions for queue work are `Ready` → `In Progress` → `In Review`. Use `In Review` only after required checks and a concrete PR exist. A plain Ready request authorizes no PR merge, issue closure or `Done`. When the owner's invocation explicitly authorizes completion, follow the workflow's *owner-authorized completion* section: merge only with every acceptance criterion and required check PASS, confirm the merge, close as completed and set `Done`; keep Deferred scope open. Production deployment, credential provisioning and destructive cleanup are never authorized by the queue.
 
 Before starting and after handing off an issue, inspect dependencies and refresh eligibility. An open PR or an `In Review` status does not satisfy an implementation dependency. Require reviewed/merged changes, relevant check evidence and any explicit owner decision required by that dependency. A closed issue alone is also insufficient if it was cancelled or lacks completion evidence.
 
