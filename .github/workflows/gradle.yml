@@ -1,0 +1,57 @@
+# Reusable Gradle check (ERP-02/.github#8): Java 25 toolchain, the repository's Gradle wrapper and Testcontainers on
+# the runner's Docker. Optionally installs a Node project and Playwright Chromium for backend tests that drive a browser.
+name: gradle
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: Directory with the Gradle wrapper.
+        type: string
+        default: .
+      tasks:
+        description: Gradle tasks to run.
+        type: string
+        default: build
+      playwright-directory:
+        description: Optional Node project whose dependencies and Playwright Chromium the tests need.
+        type: string
+        default: ""
+      node-version-file:
+        description: Node version file used with playwright-directory.
+        type: string
+        default: .nvmrc
+
+permissions:
+  contents: read
+
+jobs:
+  gradle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      - if: inputs.playwright-directory != ''
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: ${{ inputs.node-version-file }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.playwright-directory }}/package-lock.json
+      - if: inputs.playwright-directory != ''
+        working-directory: ${{ inputs.playwright-directory }}
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      - working-directory: ${{ inputs.working-directory }}
+        env:
+          GRADLE_TASKS: ${{ inputs.tasks }}
+        run: |
+          read -r -a tasks <<<"$GRADLE_TASKS"
+          ./gradlew --no-daemon "${tasks[@]}"

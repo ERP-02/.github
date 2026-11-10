@@ -1,0 +1,28 @@
+# Reusable documentation check (ERP-02/.github#8): the ERP-02/developer-tools agent-setup validator, which checks the
+# canonical agent instructions, Claude adapters, skill metadata and every local Markdown link of the repository.
+name: docs
+
+on:
+  workflow_call:
+    inputs:
+      repository-name:
+        description: Workspace directory name of the repository (defaults to the GitHub repository name).
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  agent-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: workspace/${{ inputs.repository-name || github.event.repository.name }}
+      - uses: ERP-02/developer-tools@369536178d4e9d1bdb5ed0b5670c2d4bfc1459f6
+        with:
+          workspace: workspace
+          repos: ${{ inputs.repository-name || github.event.repository.name }}

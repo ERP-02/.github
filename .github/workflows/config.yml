@@ -1,0 +1,41 @@
+# Reusable configuration check (ERP-02/.github#8): syntax of every tracked shell and Python script, then an optional
+# repository-owned validation script (e.g. docker compose config of each stack). Starts no containers.
+name: config
+
+on:
+  workflow_call:
+    inputs:
+      validate-script:
+        description: Optional repository-relative script run after the syntax checks.
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Script syntax
+        run: |
+          status=0
+          while IFS= read -r -d '' file; do
+            [[ -f "$file" && ! -L "$file" ]] || continue
+            first="$(head -n1 "$file")"
+            if [[ "$file" == *.sh || "$first" =~ ^#!.*(bash|/sh) ]]; then
+              bash -n "$file" || { echo "::error file=$file::shell syntax error"; status=1; }
+            elif [[ "$file" == *.py || "$first" =~ ^#!.*python ]]; then
+              python3 -c 'import ast, sys; ast.parse(open(sys.argv[1], encoding="utf-8").read(), sys.argv[1])' "$file" \
+                || { echo "::error file=$file::Python syntax error"; status=1; }
+            fi
+          done < <(git ls-files -z)
+          exit "$status"
+      - if: inputs.validate-script != ''
+        env:
+          SCRIPT: ${{ inputs.validate-script }}
+        run: bash "./$SCRIPT"
