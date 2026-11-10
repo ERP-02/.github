@@ -1,0 +1,18 @@
+# CI of this repository (ERP-02/.github#8).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs:
+    uses: ./.github/workflows/docs.yml

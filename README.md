@@ -17,3 +17,16 @@ Keep internal service designs and private data in `documentation`. The shared ru
 ## Parent workspace entrypoint
 
 Versioned [workspace AGENTS.md](workspace/AGENTS.md) and [Claude adapter](workspace/CLAUDE.md) provide the sibling-repository map and the owner-configured single-agent Ready queue. Copy them to the parent workspace without overwriting existing files; see `documentation/standards/ready-issue-workflow.md` in the local architecture checkout for setup and live Project/dependency handling. The parent folder does not become a monorepo.
+
+## Reusable CI workflows
+
+`.github/workflows/` holds the reusable pull-request checks that the ERP-02 repositories call with `uses: ERP-02/.github/.github/workflows/<name>.yml@<commit>` (pin the full commit SHA; update it deliberately):
+
+| Workflow | Runs | Inputs |
+| --- | --- | --- |
+| `gradle.yml` | Java 25 (Temurin) and the repository's Gradle wrapper, with Testcontainers on the runner's Docker | `working-directory`, `tasks` (default `build`), optional `playwright-directory` + `node-version-file` for backend tests that drive Chromium |
+| `node.yml` | `npm ci`, then `typecheck lint test build` | `working-directory`, `node-version-file`, `scripts` |
+| `docs.yml` | ERP-02/developer-tools agent-setup validator: canonical instructions, Claude adapters, skill metadata, local Markdown links | `repository-name` (defaults to the repository name) |
+| `config.yml` | syntax of every tracked shell/Python script, then an optional repository script (e.g. `docker compose config` of each stack); starts no containers | `validate-script` |
+
+The workflows request only `contents: read`, check out without persisting credentials, take no secrets and are meant for `pull_request` triggers (never `pull_request_target`), so fork pull requests receive no secrets. The agent-setup action lives in the private ERP-02/developer-tools repository, whose Actions access must allow repositories of the organization. Merge gating and the plan limitation on branch protection are described in `documentation/standards/ci-merge-gating.md`.
