@@ -13,10 +13,10 @@ docker compose up -d --build --wait    # first build takes several minutes
 | What | Address | Notes |
 | --- | --- | --- |
 | ERP + frontend | http://localhost:8080 | Use `localhost`, not `127.0.0.1`. Log in with `LOCAL_ADMIN_USERNAME` / `LOCAL_ADMIN_PASSWORD` from `.env`. |
-| Workflow UI | http://localhost:5173 | Enter tenant `00000000-0000-4000-8000-000000000001` to see this tenant's data. |
+| Workflow UI | http://localhost:5173 | Signs in through Identity. Grant others `WORKFLOW_*` roles in the Identity console. |
 | Identity (issuer) | http://localhost:9000 | |
 | Identity console | http://localhost:9000/admin/ | Members, roles and user accounts. Sign in as the admin user. |
-| Workflow API (ERP-facing) | http://localhost:8081 | `oidc` mode: needs a token from Identity. |
+| Workflow API | http://localhost:8081 | `oidc` mode: Identity tokens (service or user). |
 | PostgreSQL | `127.0.0.1:15432` | Superuser `postgres`; `identity_db`, `erp_db`, `workflow_db`. |
 
 The admin user is provisioned with `ORG_ADMIN` on the whole tenant.
@@ -32,9 +32,7 @@ docker compose down -v                 # stop and DELETE all local databases
 ## How it fits together
 
 - Identity, ERP and the ERP-facing workflow instance share one network namespace. `http://localhost:9000`, `:8080` and `:8081` therefore mean the same thing to the browser and to every service, which is what makes the loopback-only http configuration work.
-- There are two workflow backends on the same `workflow_db`:
-  - `workflow` runs in `oidc` mode and validates tokens. The ERP outbox dispatcher calls it with the ERP's service token.
-  - `workflow-ui-backend` runs in workflow-engine's `header` development mode, which has **no authentication**. It serves only the workflow UI, because that UI sends `X-Tenant-Id`/`X-Roles` headers instead of tokens. Both see the same data.
+- There is **one** workflow backend, in `oidc` mode (SPEC-146). Applications such as the ERP send their Identity service token. People use the workflow UI, which signs in through Identity as `workflow-local-bff`: tokens stay in the workflow's encrypted session, and the browser only gets a session cookie. A user's workflow roles come from the Identity roles `WORKFLOW_USER`, `WORKFLOW_DESIGNER` and `WORKFLOW_ADMIN`; the admin user gets `WORKFLOW_ADMIN` from provisioning.
 - Database setup runs only on an empty volume:
   - the infrastructure Identity init script, unchanged;
   - `postgres-init/20-tenant-databases.sh`, which creates `erp_db` and then runs infrastructure's `tenant-stack/postgres-ops/ensure-workflow-roles.sh` for `workflow_db`. That script creates workflow-engine's role layout with the random passwords from `.env`.
