@@ -44,6 +44,23 @@ docker compose down -v                 # stop and DELETE all local databases
 
 Open **http://localhost:9000/admin/**, sign in as the admin user and choose the workspace. There you can create users (they become members of the workspace), assign and revoke roles, change memberships, reset passwords and block accounts. `ORG_VIEWER` reads everything, `ORG_ADMIN` can do everything (including this console), and `BRANCH_ADMIN` reads and runs one branch's operations. New users sign in to the ERP at http://localhost:8080 with the password you set.
 
+## HR leave approval in the workflow
+
+The ERP starts leave approval in the workflow (`ERP_HR_LEAVE_WORKFLOW_DEFINITION=hr-leave-approval`; set `LOCAL_HR_LEAVE_WORKFLOW_DEFINITION=` in `.env` to approve in the ERP instead). Publish the ERP-owned definition once per fresh `workflow_db`, as a user with the workflow role `DESIGNER` (the admin user has `WORKFLOW_ADMIN`):
+
+```bash
+cd ../../erp
+WORKFLOW_UI_URL=http://localhost:5173 WORKFLOW_USERNAME=<admin user> WORKFLOW_PASSWORD=<admin password> \
+    scripts/publish-workflow-definition.py workflows/hr-leave-approval.json
+```
+
+Then, in the ERP (http://localhost:8080):
+
+1. Create an employee for the manager with **Kullanıcı (Identity sub)** = the manager's Identity user id. While signed in as the manager, http://localhost:8080/bff/session shows it as `user.sub`. Then create the employee with that manager.
+2. Create a leave type and a leave request for the employee, and send it for approval (**Onaya gönder**). The list shows "Yöneticide".
+3. The manager signs in at http://localhost:5173 and approves or rejects the task. They need the Identity role `WORKFLOW_USER`.
+4. Within about 5 s the ERP shows the request as approved or rejected.
+
 ## Known limitations
 
 - No purchase-approval workflow definition exists, so `erp.procurement.approval-workflow-definition` stays empty and the ERP starts no workflow yet. The ERP → workflow call itself works: Identity's `at+jwt` service token is accepted (workflow-engine#18).

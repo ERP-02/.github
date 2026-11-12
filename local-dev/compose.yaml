@@ -121,6 +121,9 @@ services:
       # Outbox dispatcher on: the tenant workflow (oidc instance below) on the shared loopback, plain http locally.
       ERP_WORKFLOW_BASE_URL: http://localhost:8081
       ERP_WORKFLOW_ALLOW_PLAINTEXT: "true"
+      # HR leave approval in the workflow (ADR-0016). Publish the definition once (README); empty = approval in ERP.
+      ERP_HR_LEAVE_WORKFLOW_DEFINITION: ${LOCAL_HR_LEAVE_WORKFLOW_DEFINITION-hr-leave-approval}
+      ERP_HR_LEAVE_WORKFLOW_POLL_MS: "5000"
       SERVER_ADDRESS: 0.0.0.0
       SERVER_PORT: "8080"
       # No observability stack here; see ../../infrastructure/compose.observability.yaml if needed.
