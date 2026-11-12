@@ -1,0 +1,204 @@
+# Local test stack for ERP-02: central Identity + one tenant ERP (with its bundled frontend), PostgreSQL and Redis.
+# Local manual testing only. Not a deployment template: production uses ../../infrastructure (tenant-stack/, identity/)
+# with TLS, digest-pinned images, isolated networks and a secret manager.
+#
+#   ./init-env.sh                 # once: writes .env with random local secrets (never overwrites)
+#   docker compose up -d --build --wait
+#   open http://localhost:8080    # log in with LOCAL_ADMIN_USERNAME / LOCAL_ADMIN_PASSWORD from .env
+#
+# Identity and ERP share one network namespace (erp uses network_mode service:identity), so the loopback URLs
+# http://localhost:9000 (issuer) and http://localhost:8080 (ERP) mean the same thing to the browser and to both
+# services. That is what lets the http-only loopback issuer/BFF configuration work without TLS.
+name: erp02-local
+
+x-restart: &restart
+  restart: unless-stopped
+
+services:
+  postgres:
+    <<: *restart
+    image: postgres:18.6
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --auth-host=scram-sha-256"
+      TZ: UTC
+    command: ["postgres", "-c", "password_encryption=scram-sha-256"]
+    secrets:
+      [postgres_superuser_password, identity_db_password, erp_db_password, workflow_db_password, monitor_db_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      # The infrastructure init scripts, unchanged: identity_db/identity_app, erp_db/erp_app (+ workflow_db, monitor).
+      - ../../infrastructure/identity/postgres-init/10-identity-database.sh:/docker-entrypoint-initdb.d/10-identity-database.sh:ro
+      - ../../infrastructure/tenant-stack/postgres-init/10-service-databases.sh:/docker-entrypoint-initdb.d/20-service-databases.sh:ro
+    ports: ["127.0.0.1:${LOCAL_POSTGRES_PORT:-15432}:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  redis:
+    <<: *restart
+    image: redis:8.10.3-alpine
+    command: ["sh", "-c", "exec redis-server --appendonly yes --maxmemory-policy noeviction --requirepass \"$$(cat /run/secrets/redis_password)\""]
+    secrets: [redis_password]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  identity:
+    <<: *restart
+    image: erp02-local/identity-service
+    build:
+      context: ../../identity-service
+      # identity-service's own Dockerfile expects a prebuilt jar; this builds it from source instead.
+      dockerfile_inline: |
+        # syntax=docker/dockerfile:1
+        FROM eclipse-temurin:25-jdk AS build
+        WORKDIR /src
+        COPY . .
+        RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon -q bootJar -x test \
+            && cp "$$(ls build/libs/identity-service-*.jar | grep -v -- -plain | head -1)" /identity-service.jar
+        FROM eclipse-temurin:25-jre
+        RUN useradd --system --uid 10001 identity
+        COPY --from=build /identity-service.jar /app/identity-service.jar
+        USER 10001
+        ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "/app/identity-service.jar"]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      IDENTITY_ISSUER: http://localhost:9000
+      IDENTITY_DB_URL: jdbc:postgresql://postgres:5432/identity_db
+      IDENTITY_DB_USERNAME: identity_app
+      IDENTITY_COOKIE_SECURE: "false"
+      IDENTITY_PROVISIONING_FILE: /run/provisioning/provisioning.json
+      IDENTITY_PROVISIONING_ALLOW_INSECURE_LOOPBACK: "true"
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: "9000"
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+    secrets:
+      - { source: identity_db_password, target: IDENTITY_DB_PASSWORD }
+      - { source: identity_key_encryption_password, target: IDENTITY_KEY_ENCRYPTION_PASSWORD }
+      - { source: identity_key_encryption_salt, target: IDENTITY_KEY_ENCRYPTION_SALT }
+      - { source: identity_service_client_secret, target: IDENTITY_SERVICE_CLIENT_SECRET }
+      # Files referenced by the provisioning document (kept outside the configtree directory).
+      - { source: erp_bff_client_secret, target: /run/provisioning/erp-bff }
+      - { source: erp_service_client_secret, target: /run/provisioning/erp-service }
+      - { source: identity_service_client_secret, target: /run/provisioning/identity-service }
+      - { source: local_admin_password, target: /run/provisioning/admin-password }
+    configs:
+      - { source: provisioning, target: /run/provisioning/provisioning.json }
+    # The shared namespace's published ports: Identity issuer and the ERP entry point.
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:8080:8080"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  erp:
+    <<: *restart
+    image: erp02-local/erp
+    build:
+      context: ../../erp   # the ERP production image (backend + bundled frontend), erp/Dockerfile
+    network_mode: "service:identity"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      identity: { condition: service_healthy }
+    environment:
+      ERP_TENANT_ID: ${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}
+      ERP_TENANT_KEY: ${LOCAL_TENANT_KEY:-local}
+      ERP_IDENTITY_ISSUER: http://localhost:9000
+      ERP_PUBLIC_BASE_URL: http://localhost:8080
+      ERP_COOKIE_SECURE: "false"
+      DB_URL: jdbc:postgresql://postgres:5432/erp_db
+      DB_USERNAME: erp_app
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: "8080"
+      # No observability stack here; see ../../infrastructure/compose.observability.yaml if needed.
+      MANAGEMENT_OTLP_METRICS_EXPORT_ENABLED: "false"
+      MANAGEMENT_TRACING_EXPORT_OTLP_ENABLED: "false"
+      MANAGEMENT_LOGGING_EXPORT_OTLP_ENABLED: "false"
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+    secrets:
+      - { source: erp_db_password, target: DB_PASSWORD }
+      - { source: redis_password, target: REDIS_PASSWORD }
+      - { source: erp_bff_client_secret, target: ERP_BFF_CLIENT_SECRET }
+      - { source: erp_service_client_secret, target: ERP_SERVICE_CLIENT_SECRET }
+      - { source: erp_session_encryption_password, target: ERP_SESSION_ENCRYPTION_PASSWORD }
+      - { source: erp_session_encryption_salt, target: ERP_SESSION_ENCRYPTION_SALT }
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health/readiness HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+configs:
+  # Applied idempotently by Identity at every start: the tenant, its BFF/service clients and one admin user.
+  provisioning:
+    content: |
+      {
+        "tenants": [{
+          "tenant_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}",
+          "tenant_key": "${LOCAL_TENANT_KEY:-local}",
+          "display_name": "${LOCAL_TENANT_NAME:-Local}",
+          "erp_base_url": "http://localhost:8080",
+          "status": "ACTIVE",
+          "bff_client_secret_file": "/run/provisioning/erp-bff",
+          "service_client_secret_file": "/run/provisioning/erp-service"
+        }],
+        "identity_service_client_secret_file": "/run/provisioning/identity-service",
+        "users": [{
+          "username": "${LOCAL_ADMIN_USERNAME:?run ./init-env.sh first}",
+          "display_name": "Local Admin",
+          "password_file": "/run/provisioning/admin-password",
+          "status": "ACTIVE"
+        }],
+        "memberships": [{
+          "username": "${LOCAL_ADMIN_USERNAME}",
+          "tenant_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}",
+          "status": "ACTIVE"
+        }],
+        "assignments": [{
+          "username": "${LOCAL_ADMIN_USERNAME}",
+          "tenant_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}",
+          "role": "ORG_ADMIN",
+          "scope_type": "TENANT",
+          "scope_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}"
+        }]
+      }
+
+# Secret values come from .env (created by ./init-env.sh) and are mounted as files, never put in service environments.
+secrets:
+  postgres_superuser_password: { environment: POSTGRES_SUPERUSER_PASSWORD }
+  identity_db_password: { environment: IDENTITY_DB_PASSWORD }
+  erp_db_password: { environment: ERP_DB_PASSWORD }
+  workflow_db_password: { environment: WORKFLOW_DB_PASSWORD }
+  monitor_db_password: { environment: MONITOR_DB_PASSWORD }
+  redis_password: { environment: REDIS_PASSWORD }
+  identity_key_encryption_password: { environment: IDENTITY_KEY_ENCRYPTION_PASSWORD }
+  identity_key_encryption_salt: { environment: IDENTITY_KEY_ENCRYPTION_SALT }
+  identity_service_client_secret: { environment: IDENTITY_SERVICE_CLIENT_SECRET }
+  erp_bff_client_secret: { environment: ERP_BFF_CLIENT_SECRET }
+  erp_service_client_secret: { environment: ERP_SERVICE_CLIENT_SECRET }
+  erp_session_encryption_password: { environment: ERP_SESSION_ENCRYPTION_PASSWORD }
+  erp_session_encryption_salt: { environment: ERP_SESSION_ENCRYPTION_SALT }
+  local_admin_password: { environment: LOCAL_ADMIN_PASSWORD }
+
+volumes:
+  postgres_data:
+  redis_data:
