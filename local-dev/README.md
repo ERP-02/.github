@@ -1,36 +1,47 @@
 # Local test stack
 
-Runs central Identity, one tenant ERP (backend with the bundled frontend), PostgreSQL and Redis on this machine for manual testing. It is not a deployment template: production uses the `infrastructure` repository (TLS, digest-pinned images, isolated networks, secret manager).
+Runs the whole system for one tenant on this machine for manual testing. Central Identity runs once. The tenant gets its own ERP (backend with the bundled frontend), workflow-engine, PostgreSQL (separate `erp_db` and `workflow_db`) and Redis. This is not a deployment template: production uses the `infrastructure` repository (TLS, digest-pinned images, isolated networks, secret manager).
 
-Requires Docker with Compose and the sibling `erp`, `identity-service` and `infrastructure` checkouts next to this `.github` checkout.
+Requires Docker with Compose and the sibling `erp`, `identity-service`, `workflow-engine` and `infrastructure` checkouts next to this `.github` checkout. No sibling repository is modified.
 
 ```bash
 cd .github/local-dev
 ./init-env.sh                          # once: creates .env with random local secrets (never overwrites)
-docker compose up -d --build --wait    # first build takes a few minutes
+docker compose up -d --build --wait    # first build takes several minutes
 ```
 
-Open **http://localhost:8080** (use `localhost`, not `127.0.0.1`: it must match the configured origin). Log in with `LOCAL_ADMIN_USERNAME` / `LOCAL_ADMIN_PASSWORD` from `.env`.
-
-| Service | Address |
-| --- | --- |
-| ERP + frontend | http://localhost:8080 |
-| Identity (issuer) | http://localhost:9000 |
-| PostgreSQL | `127.0.0.1:15432` (superuser `postgres`; `identity_db`, `erp_db`) |
+| What | Address | Notes |
+| --- | --- | --- |
+| ERP + frontend | http://localhost:8080 | Use `localhost`, not `127.0.0.1`. Log in with `LOCAL_ADMIN_USERNAME` / `LOCAL_ADMIN_PASSWORD` from `.env`. |
+| Workflow UI | http://localhost:5173 | Enter tenant `00000000-0000-4000-8000-000000000001` to see this tenant's data. |
+| Identity (issuer) | http://localhost:9000 | |
+| Workflow API (ERP-facing) | http://localhost:8081 | `oidc` mode: needs a token from Identity. |
+| PostgreSQL | `127.0.0.1:15432` | Superuser `postgres`; `identity_db`, `erp_db`, `workflow_db`. |
 
 The admin user is provisioned with `ORG_ADMIN` on the whole tenant.
 
 ```bash
 docker compose ps
-docker compose logs -f erp identity
+docker compose logs -f erp identity workflow
 docker compose up -d --build --wait    # after pulling new code
 docker compose down                    # stop; data is kept
-docker compose down -v                 # stop and DELETE the local databases
+docker compose down -v                 # stop and DELETE all local databases
 ```
 
-## Notes
+## How it fits together
 
-- Identity and ERP share one network namespace, so `http://localhost:9000` and `http://localhost:8080` work the same for the browser and for both services. This makes the loopback-only http configuration work.
-- The PostgreSQL init scripts are mounted from `infrastructure` unchanged and run only on an empty volume. If you edit passwords in `.env` later, run `docker compose down -v` (this deletes local data).
-- workflow-engine and the observability stack are not included. The ERP runs with the workflow dispatcher off and OTLP export disabled.
-- **Known limitation:** Identity's role catalog currently contains only `erp.company.*` and `erp.branch.*` (contract `authorization-v1` §6). The business module APIs (core, accounting, inventory, procurement, sales) therefore return 403 for every user until the catalog migration for those permissions exists.
+- Identity, ERP and the ERP-facing workflow instance share one network namespace. `http://localhost:9000`, `:8080` and `:8081` therefore mean the same thing to the browser and to every service, which is what makes the loopback-only http configuration work.
+- There are two workflow backends on the same `workflow_db`:
+  - `workflow` runs in `oidc` mode and validates tokens. The ERP outbox dispatcher calls it with the ERP's service token.
+  - `workflow-ui-backend` runs in workflow-engine's `header` development mode, which has **no authentication**. It serves only the workflow UI, because that UI sends `X-Tenant-Id`/`X-Roles` headers instead of tokens. Both see the same data.
+- Database setup runs only on an empty volume:
+  - the infrastructure Identity script, unchanged;
+  - `postgres-init/20-tenant-databases.sh`, which creates `erp_db` and builds `workflow_db` with workflow-engine's own role/schema script.
+- If you edit passwords in `.env` later, run `docker compose down -v` (this deletes local data).
+- No observability stack is included. OTLP export is disabled.
+
+## Known limitations
+
+- **Business module APIs return 403.** Identity's role catalog contains only `erp.company.*` and `erp.branch.*` (contract `identity/authorization-v1` §6). Core, accounting, inventory, procurement and sales are forbidden for every user until a catalog migration adds their permissions.
+- **workflow rejects the ERP's service token (401).** Identity issues `typ: at+jwt` as `identity/service-tokens-v1` requires. workflow-engine's JWT decoder accepts only `typ: JWT`, so the ERP → workflow call fails until one side changes. Contract §6 says no workflow change is needed, which is incorrect.
+- No purchase-approval workflow definition exists. `erp.procurement.approval-workflow-definition` stays empty, so the ERP does not start any workflow yet.
