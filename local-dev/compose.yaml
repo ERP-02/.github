@@ -83,6 +83,7 @@ services:
       - { source: erp_service_client_secret, target: /run/provisioning/erp-service }
       - { source: identity_service_client_secret, target: /run/provisioning/identity-service }
       - { source: local_admin_password, target: /run/provisioning/admin-password }
+      - { source: workflow_bff_client_secret, target: /run/provisioning/workflow-bff }
     configs:
       - { source: provisioning, target: /run/provisioning/provisioning.json }
     # The shared namespace's published ports: Identity issuer, the ERP entry point and the ERP-facing workflow API.
@@ -141,11 +142,9 @@ services:
       retries: 30
       start_period: 40s
 
-  # Tenant workflow-engine, built from ../../workflow-engine without changing it. Two backend instances share one
-  # workflow_db (the engine is built for several instances on one database):
-  #   workflow     oidc mode: validates the ERP's service token from Identity; the API the ERP dispatcher calls.
-  #   workflow-ui  header mode (workflow-engine's local development mode, NO authentication): only behind the
-  #                workflow web UI, because that UI sends X-Tenant-Id/X-Roles headers instead of tokens.
+  # Tenant workflow-engine: ONE backend in oidc mode for both callers (SPEC-146, oidc-bff-session-v1 §9):
+  #   applications (the ERP outbox dispatcher) send their Identity service token;
+  #   people use the workflow UI (http://localhost:5173), which signs in through Identity as workflow-local-bff.
   workflow:
     <<: *restart
     image: erp02-local/workflow-engine
@@ -166,37 +165,23 @@ services:
       SERVER_PORT: "8081"
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:9000
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES: urn:erp02:workflow:${LOCAL_TENANT_KEY:-local}
+      # Identity BFF for the workflow UI (secrets below); the UI's public origin is the nginx of workflow-web.
+      HWF_BFF_CLIENT_ID: workflow-${LOCAL_TENANT_KEY:-local}-bff
+      HWF_BFF_PUBLIC_BASE_URL: http://localhost:5173
+      HWF_BFF_ISSUER: http://localhost:9000
+      HWF_BFF_COOKIE_SECURE: "false"
       SPRING_CONFIG_IMPORT: configtree:/run/secrets/
-    secrets: &workflow-db-secrets
+    secrets:
       - { source: workflow_db_password, target: hwf.db.app.password }
       - { source: workflow_owner_db_password, target: hwf.db.owner.password }
       - { source: workflow_scheduler_db_password, target: hwf.db.scheduler.password }
       - { source: workflow_projector_db_password, target: hwf.db.projector.password }
       - { source: workflow_archiver_db_password, target: hwf.db.archiver.password }
+      - { source: workflow_bff_client_secret, target: hwf.bff.client-secret }
+      - { source: workflow_bff_session_encryption_password, target: hwf.bff.session-encryption-password }
+      - { source: workflow_bff_session_encryption_salt, target: hwf.bff.session-encryption-salt }
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
-      interval: 10s
-      timeout: 5s
-      retries: 30
-      start_period: 60s
-
-  workflow-ui-backend:
-    <<: *restart
-    image: erp02-local/workflow-engine
-    depends_on:
-      workflow: { condition: service_healthy }   # let the oidc instance run the Flyway migrations first
-    environment:
-      SPRING_PROFILES_ACTIVE: local
-      HWF_SECURITY_MODE: header
-      HWF_DB_HOST: postgres
-      HWF_DB_NAME: workflow_db
-      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
-    secrets: *workflow-db-secrets
-    networks:
-      default:
-        aliases: [backend]   # the host name workflow-engine's web nginx.conf proxies /api/ to
-    healthcheck:
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -209,7 +194,10 @@ services:
       context: ../../workflow-engine/web
       target: runtime
     depends_on:
-      workflow-ui-backend: { condition: service_healthy }
+      workflow: { condition: service_healthy }
+    environment:
+      # The workflow backend runs in Identity's network namespace (port 8081); "identity" is that container's name.
+      HWF_BACKEND_URL: http://identity:8081
     ports: ["127.0.0.1:5173:80"]
 
 configs:
@@ -224,7 +212,9 @@ configs:
           "erp_base_url": "http://localhost:8080",
           "status": "ACTIVE",
           "bff_client_secret_file": "/run/provisioning/erp-bff",
-          "service_client_secret_file": "/run/provisioning/erp-service"
+          "service_client_secret_file": "/run/provisioning/erp-service",
+          "workflow_base_url": "http://localhost:5173",
+          "workflow_bff_client_secret_file": "/run/provisioning/workflow-bff"
         }],
         "identity_service_client_secret_file": "/run/provisioning/identity-service",
         "users": [{
@@ -242,6 +232,12 @@ configs:
           "username": "${LOCAL_ADMIN_USERNAME}",
           "tenant_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}",
           "role": "ORG_ADMIN",
+          "scope_type": "TENANT",
+          "scope_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}"
+        }, {
+          "username": "${LOCAL_ADMIN_USERNAME}",
+          "tenant_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}",
+          "role": "WORKFLOW_ADMIN",
           "scope_type": "TENANT",
           "scope_id": "${LOCAL_TENANT_ID:-00000000-0000-4000-8000-000000000001}"
         }]
@@ -266,6 +262,9 @@ secrets:
   erp_session_encryption_password: { environment: ERP_SESSION_ENCRYPTION_PASSWORD }
   erp_session_encryption_salt: { environment: ERP_SESSION_ENCRYPTION_SALT }
   local_admin_password: { environment: LOCAL_ADMIN_PASSWORD }
+  workflow_bff_client_secret: { environment: WORKFLOW_BFF_CLIENT_SECRET }
+  workflow_bff_session_encryption_password: { environment: WORKFLOW_BFF_SESSION_ENCRYPTION_PASSWORD }
+  workflow_bff_session_encryption_salt: { environment: WORKFLOW_BFF_SESSION_ENCRYPTION_SALT }
 
 volumes:
   postgres_data:
