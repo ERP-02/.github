@@ -15,6 +15,7 @@ docker compose up -d --build --wait    # first build takes several minutes
 | ERP + frontend | http://localhost:8080 | Use `localhost`, not `127.0.0.1`. Log in with `LOCAL_ADMIN_USERNAME` / `LOCAL_ADMIN_PASSWORD` from `.env`. |
 | Workflow UI | http://localhost:5173 | Enter tenant `00000000-0000-4000-8000-000000000001` to see this tenant's data. |
 | Identity (issuer) | http://localhost:9000 | |
+| Identity console | http://localhost:9000/admin/ | Members, roles and user accounts. Sign in as the admin user. |
 | Workflow API (ERP-facing) | http://localhost:8081 | `oidc` mode: needs a token from Identity. |
 | PostgreSQL | `127.0.0.1:15432` | Superuser `postgres`; `identity_db`, `erp_db`, `workflow_db`. |
 
@@ -41,9 +42,9 @@ docker compose down -v                 # stop and DELETE all local databases
 - If you change passwords already in `.env`, run `docker compose down -v` (this deletes local data).
 - No observability stack is included. OTLP export is disabled.
 
-## Role assignments
+## Role assignments and users
 
-Open **http://localhost:9000/admin**, sign in as the admin user, choose the workspace and assign roles there. To try other users, add them as members first. Users themselves are still created by provisioning: add one to the `provisioning` config in `compose.yaml`, then `docker compose up -d identity`. `ORG_VIEWER` reads everything, `ORG_ADMIN` can do everything, and `BRANCH_ADMIN` reads and runs one branch's operations.
+Open **http://localhost:9000/admin/**, sign in as the admin user and choose the workspace. There you can create users (they become members of the workspace), assign and revoke roles, change memberships, reset passwords and block accounts. `ORG_VIEWER` reads everything, `ORG_ADMIN` can do everything (including this console), and `BRANCH_ADMIN` reads and runs one branch's operations. New users sign in to the ERP at http://localhost:8080 with the password you set.
 
 ## Known limitations
 
