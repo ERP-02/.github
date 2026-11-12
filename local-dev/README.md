@@ -35,13 +35,16 @@ docker compose down -v                 # stop and DELETE all local databases
   - `workflow` runs in `oidc` mode and validates tokens. The ERP outbox dispatcher calls it with the ERP's service token.
   - `workflow-ui-backend` runs in workflow-engine's `header` development mode, which has **no authentication**. It serves only the workflow UI, because that UI sends `X-Tenant-Id`/`X-Roles` headers instead of tokens. Both see the same data.
 - Database setup runs only on an empty volume:
-  - the infrastructure Identity script, unchanged;
-  - `postgres-init/20-tenant-databases.sh`, which creates `erp_db` and builds `workflow_db` with workflow-engine's own role/schema script.
-- If you edit passwords in `.env` later, run `docker compose down -v` (this deletes local data).
+  - the infrastructure Identity init script, unchanged;
+  - `postgres-init/20-tenant-databases.sh`, which creates `erp_db` and then runs infrastructure's `tenant-stack/postgres-ops/ensure-workflow-roles.sh` for `workflow_db`. That script creates workflow-engine's role layout with the random passwords from `.env`.
+- `./init-env.sh` only adds missing keys to an existing `.env`. For a volume created by an earlier version of this stack, run it, then `docker compose up -d --wait postgres` and `docker compose exec postgres bash /opt/erp-ops/ensure-workflow-roles.sh`, then `docker compose up -d --build --wait`.
+- If you change passwords already in `.env`, run `docker compose down -v` (this deletes local data).
 - No observability stack is included. OTLP export is disabled.
+
+## Role assignments
+
+Open **http://localhost:9000/admin**, sign in as the admin user, choose the workspace and assign roles there. To try other users, add them as members first. Users themselves are still created by provisioning: add one to the `provisioning` config in `compose.yaml`, then `docker compose up -d identity`. `ORG_VIEWER` reads everything, `ORG_ADMIN` can do everything, and `BRANCH_ADMIN` reads and runs one branch's operations.
 
 ## Known limitations
 
-- **Business module APIs return 403.** Identity's role catalog contains only `erp.company.*` and `erp.branch.*` (contract `identity/authorization-v1` §6). Core, accounting, inventory, procurement and sales are forbidden for every user until a catalog migration adds their permissions.
-- **workflow rejects the ERP's service token (401).** Identity issues `typ: at+jwt` as `identity/service-tokens-v1` requires. workflow-engine's JWT decoder accepts only `typ: JWT`, so the ERP → workflow call fails until one side changes. Contract §6 says no workflow change is needed, which is incorrect.
-- No purchase-approval workflow definition exists. `erp.procurement.approval-workflow-definition` stays empty, so the ERP does not start any workflow yet.
+- No purchase-approval workflow definition exists, so `erp.procurement.approval-workflow-definition` stays empty and the ERP starts no workflow yet. The ERP → workflow call itself works: Identity's `at+jwt` service token is accepted (workflow-engine#18).

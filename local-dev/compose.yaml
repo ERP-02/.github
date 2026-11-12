@@ -24,17 +24,17 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --auth-host=scram-sha-256"
       TZ: UTC
-    # pg_stat_statements and commit timestamps are what workflow-engine's own compose configures.
-    command: ["postgres", "-c", "password_encryption=scram-sha-256", "-c", "max_connections=300",
-              "-c", "shared_preload_libraries=pg_stat_statements", "-c", "track_commit_timestamp=on"]
-    secrets: [postgres_superuser_password, identity_db_password, erp_db_password]
+    command: ["postgres", "-c", "password_encryption=scram-sha-256", "-c", "max_connections=300"]
+    secrets: [postgres_superuser_password, identity_db_password, erp_db_password, workflow_db_password,
+              workflow_owner_db_password, workflow_scheduler_db_password, workflow_projector_db_password,
+              workflow_archiver_db_password]
     volumes:
       - postgres_data:/var/lib/postgresql
       # identity_db/identity_app: the infrastructure Identity init script, unchanged.
       - ../../infrastructure/identity/postgres-init/10-identity-database.sh:/docker-entrypoint-initdb.d/10-identity-database.sh:ro
-      # erp_db/erp_app and workflow_db (with workflow-engine's own role/schema script).
+      # erp_db/erp_app, then workflow_db through the infrastructure tenant-stack script (workflow-engine's role layout).
       - ./postgres-init/20-tenant-databases.sh:/docker-entrypoint-initdb.d/20-tenant-databases.sh:ro
-      - ../../workflow-engine/infra/postgres/init/01-roles-and-schema.sql:/opt/workflow-init/01-roles-and-schema.sql:ro
+      - ../../infrastructure/tenant-stack/postgres-ops/ensure-workflow-roles.sh:/opt/erp-ops/ensure-workflow-roles.sh:ro
     ports: ["127.0.0.1:${LOCAL_POSTGRES_PORT:-15432}:5432"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
@@ -179,6 +179,13 @@ services:
       SERVER_PORT: "8081"
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:9000
       SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_AUDIENCES: urn:erp02:workflow:${LOCAL_TENANT_KEY:-local}
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+    secrets: &workflow-db-secrets
+      - { source: workflow_db_password, target: hwf.db.app.password }
+      - { source: workflow_owner_db_password, target: hwf.db.owner.password }
+      - { source: workflow_scheduler_db_password, target: hwf.db.scheduler.password }
+      - { source: workflow_projector_db_password, target: hwf.db.projector.password }
+      - { source: workflow_archiver_db_password, target: hwf.db.archiver.password }
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8081 && printf 'GET /actuator/health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
       interval: 10s
@@ -196,6 +203,8 @@ services:
       HWF_SECURITY_MODE: header
       HWF_DB_HOST: postgres
       HWF_DB_NAME: workflow_db
+      SPRING_CONFIG_IMPORT: configtree:/run/secrets/
+    secrets: *workflow-db-secrets
     networks:
       default:
         aliases: [backend]   # the host name workflow-engine's web nginx.conf proxies /api/ to
@@ -256,6 +265,11 @@ secrets:
   postgres_superuser_password: { environment: POSTGRES_SUPERUSER_PASSWORD }
   identity_db_password: { environment: IDENTITY_DB_PASSWORD }
   erp_db_password: { environment: ERP_DB_PASSWORD }
+  workflow_db_password: { environment: WORKFLOW_DB_PASSWORD }
+  workflow_owner_db_password: { environment: WORKFLOW_OWNER_DB_PASSWORD }
+  workflow_scheduler_db_password: { environment: WORKFLOW_SCHEDULER_DB_PASSWORD }
+  workflow_projector_db_password: { environment: WORKFLOW_PROJECTOR_DB_PASSWORD }
+  workflow_archiver_db_password: { environment: WORKFLOW_ARCHIVER_DB_PASSWORD }
   redis_password: { environment: REDIS_PASSWORD }
   identity_key_encryption_password: { environment: IDENTITY_KEY_ENCRYPTION_PASSWORD }
   identity_key_encryption_salt: { environment: IDENTITY_KEY_ENCRYPTION_SALT }
