@@ -16,6 +16,7 @@ Shared instructions for Codex and Claude Code. Repository instructions add local
 - Each repository owns its code, schema and public contracts. Do not read or write another service's database directly or silently change another repository's model.
 - Contract changes need identified consumers, compatibility assessment and review in the owning repository. Avoid cross-repository dependencies without an accepted decision or explicit review.
 - Use environment-driven configuration, least privilege, migrations and idempotency where the actual operation requires them.
+- Frontend data tables (owner decision, 2026-11-13): column headers are left-aligned with a vertical line between columns; row actions are icon-only buttons whose text is a tooltip and accessible name; two- or three-valued statuses (yes/no, active/inactive, present/absent) are coloured dots with a screen-reader label, explained by a legend under the table, with tones chosen by meaning (e.g. active green, inactive grey). Statuses with four or more values, kinds and states carrying details keep text. Each frontend's `AGENTS.md` names its components.
 
 ## Work and verification
 - Inspect the existing implementation and available commands before selecting tools. Keep changes within scope and preserve unrelated work.
