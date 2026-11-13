@@ -29,6 +29,17 @@ docker compose down                    # stop; data is kept
 docker compose down -v                 # stop and DELETE all local databases
 ```
 
+## Test data
+
+`../../erp/scripts/seed-test-data.py` fills an empty ERP through its REST API with a connected dataset: two companies, partners, items, stock, journal entries, purchase and sales documents in every state, HR organization, employees and leave requests. With `SEED_USER_PASSWORD` set it also creates the Identity test users `demo.viewer`, `demo.manager`, `demo.employee`, `demo.ankara` and `demo.eu.viewer`. Publish the leave workflow definition first (see below), then:
+
+```bash
+set -a; . ./.env; set +a
+SEED_USER_PASSWORD='<12+ characters>' ../../erp/scripts/seed-test-data.py
+```
+
+It stops if company `DEMO` already exists, because posted documents cannot be deleted. Reseed after `docker compose down -v`.
+
 ## How it fits together
 
 - Identity, ERP and the ERP-facing workflow instance share one network namespace. `http://localhost:9000`, `:8080` and `:8081` therefore mean the same thing to the browser and to every service, which is what makes the loopback-only http configuration work.
