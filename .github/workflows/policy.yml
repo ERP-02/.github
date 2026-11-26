@@ -1,0 +1,36 @@
+# Reusable workflow policy check (ERP-02/.github#27): runs scripts/check-workflows.py of this repository, at the same
+# commit the caller pinned, over the caller's .github/workflows (pinned actions, permissions, no pull_request_target,
+# non-persisted checkout credentials, no secret echo, no untrusted expressions, destructive steps only on opt-in).
+name: policy
+
+on:
+  workflow_call:
+    inputs:
+      workflows-directory:
+        description: Directory with the workflows to check.
+        type: string
+        default: .github/workflows
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ERP-02/.github
+          ref: ${{ github.job_workflow_sha }}
+          path: .erp02-policy
+          persist-credentials: false
+      - name: Workflow policy
+        env:
+          DIRECTORY: ${{ inputs.workflows-directory }}
+        run: |
+          python3 -c 'import yaml' 2>/dev/null || python3 -m pip install --user --quiet pyyaml==6.0.2
+          python3 .erp02-policy/scripts/check-workflows.py "$DIRECTORY"

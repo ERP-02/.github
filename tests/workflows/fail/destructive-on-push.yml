@@ -1,0 +1,10 @@
+# expect: destructive-opt-in
+name: x
+on: push
+permissions:
+  contents: read
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: docker volume rm erp-data

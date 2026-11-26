@@ -1,0 +1,15 @@
+name: cleanup
+on:
+  workflow_dispatch:
+    inputs:
+      confirm-prune:
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    if: inputs.confirm-prune
+    steps:
+      - run: docker system prune --force

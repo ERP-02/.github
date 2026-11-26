@@ -31,6 +31,7 @@ Versioned [workspace AGENTS.md](workspace/AGENTS.md) and [Claude adapter](worksp
 | `gradle.yml` | Java 25 (Temurin) and the repository's Gradle wrapper, with Testcontainers on the runner's Docker | `working-directory`, `tasks` (default `build`), optional `playwright-directory` + `node-version-file` for backend tests that drive Chromium |
 | `node.yml` | `npm ci`, then `typecheck lint test build` | `working-directory`, `node-version-file`, `scripts` |
 | `docs.yml` | ERP-02/developer-tools agent-setup validator: canonical instructions, Claude adapters, skill metadata, local Markdown links | `repository-name` (defaults to the repository name) |
+| `policy.yml` | the workflow policy of [docs/repository-bootstrap.md](docs/repository-bootstrap.md) over the caller's `.github/workflows` | `workflows-directory` |
 | `config.yml` | syntax of every tracked shell/Python script, then an optional repository script (e.g. `docker compose config` of each stack); starts no containers | `validate-script` |
 
 The workflows request only `contents: read`, check out without persisting credentials, take no secrets and are meant for `pull_request` triggers (never `pull_request_target`), so fork pull requests receive no secrets. The agent-setup action lives in the private ERP-02/developer-tools repository, whose Actions access must allow repositories of the organization. Merge gating and the plan limitation on branch protection are described in `documentation/standards/ci-merge-gating.md`.

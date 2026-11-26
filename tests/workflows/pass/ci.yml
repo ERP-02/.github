@@ -1,0 +1,25 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [master]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Deploy token used safely
+        env:
+          TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "title: $TITLE"
+          curl -fsS -H "Authorization: Bearer $TOKEN" https://example.invalid/
+  reusable:
+    uses: ERP-02/.github/.github/workflows/docs.yml@4cb36ab3248a66fd5eb3996fcef74bd899d9a975
+  local:
+    uses: ./.github/workflows/local.yml

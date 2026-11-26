@@ -1,0 +1,11 @@
+# expect: permissions
+name: x
+on: push
+permissions:
+  contents: read
+  packages: write
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true

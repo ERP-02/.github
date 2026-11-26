@@ -1,0 +1,7 @@
+# expect: yaml
+name: x
+on: push
+jobs:
+  a:
+    steps:
+      - run: a: b: c
