@@ -1,33 +1,78 @@
 name: Task
-description: Implementation task with clear agent boundaries
+description: Implementation task with clear ownership, contracts, acceptance criteria and evidence
 title: "[TASK] "
 labels: ["type:task"]
 body:
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Owner repository
+      description: The repository whose code, schema or contract changes. Cross-repository work gets one task per owning repository.
+      options:
+        - erp
+        - identity-service
+        - infrastructure
+        - integration-hub
+        - reporting-engine
+        - documentation
+        - developer-tools
+        - shared-libraries
+        - .github
+    validations:
+      required: true
   - type: textarea
     id: objective
     attributes:
       label: Objective
       description: What should change, and why?
+      placeholder: "Example: Sales invoices can be credited in part, linked to the physical return, so stock and receivables stay consistent."
     validations:
       required: true
   - type: textarea
     id: scope
     attributes:
       label: In scope / Out of scope
+      placeholder: |
+        In scope: partial credit notes for posted invoices with a linked return.
+        Out of scope: price-only credits; e-document sending (separate task).
     validations:
       required: true
   - type: textarea
     id: dependencies
     attributes:
       label: Dependencies and contracts
+      description: Blocking issues (also add them as native "blocked by"), accepted decisions and versioned contracts this task implements.
+      placeholder: "Blocked by ERP-02/documentation#NN; implements contracts/erp/<name>-v1.md §3."
   - type: textarea
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: List observable, testable outcomes.
+      description: Observable, testable outcomes.
+      placeholder: |
+        - [ ] A credit note above the returned quantity is refused (409 `credit-exceeds-return`).
+        - [ ] Real PostgreSQL tests cover isolation, idempotency and rollback.
+    validations:
+      required: true
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking change
+      description: Does this change an existing API, event, schema, permission or configuration in an incompatible way?
+      options:
+        - "No: additive or internal only"
+        - "Yes: versioned contract change with consumers and migration plan below"
     validations:
       required: true
   - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility, migration and rollout
+      description: Required when the change is breaking; otherwise note any rollout order (e.g. Identity before ERP).
+  - type: textarea
     id: tests
     attributes:
-      label: Tests and verification
+      label: Tests and evidence
+      description: The checks that must pass and the evidence to attach (commands, results, screenshots). Report PASS, FAIL or NOT VERIFIED.
+      placeholder: "`env -u DEBUG ./gradlew build` and `npm test` on a clean checkout; live checks are NOT VERIFIED unless run."
+    validations:
+      required: true
