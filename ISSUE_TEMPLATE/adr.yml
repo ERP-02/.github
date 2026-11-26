@@ -1,0 +1,74 @@
+name: Architecture decision
+description: Request or propose a decision; the decision record itself is written in ERP-02/documentation
+title: "[ADR] "
+labels: ["type:adr"]
+body:
+  - type: markdown
+    attributes:
+      value: A decision becomes Accepted only by the owner. Open the request here or in documentation; the record goes to `documentation/architecture/decisions/` (or `architecture/adr/`) with its status.
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Owner repository
+      description: The repository that owns this work.
+      options:
+        - erp
+        - identity-service
+        - infrastructure
+        - integration-hub
+        - reporting-engine
+        - documentation
+        - developer-tools
+        - shared-libraries
+        - .github
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and problem
+      description: What forces a decision now, and what existing decisions constrain it.
+      placeholder: "Example: Payroll needs withholding events from procurement; ADR-0015 keeps modules package-separated."
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options considered
+      description: At least two options with their trade-offs (security, cost, operations, compatibility).
+      placeholder: |
+        A. Explicit withholding records on posted invoices — auditable, more user input.
+        B. Derive from payment descriptions — no input, unreliable.
+    validations:
+      required: true
+  - type: textarea
+    id: recommendation
+    attributes:
+      label: Recommendation and consequences
+      placeholder: "Recommend A: ... Consequences: new procurement API, tax reads it through procurement.api."
+    validations:
+      required: true
+  - type: textarea
+    id: affected
+    attributes:
+      label: Affected repositories and contracts
+      placeholder: "erp (procurement, tax); contracts/erp/muhsgk-v1.md §4."
+    validations:
+      required: true
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking change
+      options:
+        - "No"
+        - "Yes: consumers and migration plan are listed above"
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Owner decision needed
+      description: The exact question the owner answers. Leave the decision itself to the owner.
+      placeholder: "Accept option A for MUHSGK withholding sources?"
+    validations:
+      required: true
