@@ -16,7 +16,7 @@ Keep internal service designs and private data in `documentation`. The shared ru
 
 ## Templates and security
 
-Issue forms in `ISSUE_TEMPLATE/` (epic, task, bug, architecture decision) and the [pull request template](pull_request_template.md) are the organization defaults; blank issues are disabled. Vulnerabilities are reported privately as described in [SECURITY.md](SECURITY.md); private vulnerability reporting is enabled on this repository as the fallback route.
+Issue forms in `ISSUE_TEMPLATE/` (epic, task, bug, architecture decision) and the [pull request template](pull_request_template.md) are the organization defaults; blank issues are disabled. Vulnerabilities are reported privately as described in [SECURITY.md](SECURITY.md); private vulnerability reporting is enabled on this repository as the fallback route. [CONTRIBUTING.md](CONTRIBUTING.md) sets the branch, commit, review, escalation and exception rules and the [label taxonomy](labels.yml); the [code of conduct](CODE_OF_CONDUCT.md) applies everywhere.
 
 ## Parent workspace entrypoint
 
