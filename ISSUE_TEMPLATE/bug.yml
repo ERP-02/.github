@@ -1,0 +1,42 @@
+name: Bug
+description: Behavior that contradicts a contract, an accepted decision or documented behavior
+title: "[BUG] "
+labels: ["type:bug"]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not report security vulnerabilities here; follow SECURITY.md. Never paste secrets, tokens or production data."
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Owner repository
+      options: [erp, identity-service, infrastructure, integration-hub, reporting-engine, documentation, developer-tools, shared-libraries, .github]
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Observed behavior
+      placeholder: "Example: after revoking a membership, the workflow session kept the USER role for 10 minutes."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior and its source
+      description: The contract section, decision or documentation that defines the expected behavior.
+      placeholder: "oidc-bff-session-v1 §5: a revocation reaches the session within one validation interval."
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal, with synthetic data.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Commands, versions or commits, logs with secrets removed.

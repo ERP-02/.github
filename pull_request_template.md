@@ -6,7 +6,14 @@ Refs #
 
 ## Ownership / cross-repo impact
 
+## Breaking change
+
+- [ ] No: additive or internal only
+- [ ] Yes: contract version, affected consumers and migration/rollback plan below
+
 ## Verification
+
+Report each check as PASS, FAIL or NOT VERIFIED with the command and result.
 
 - [ ] Applicable automated or documentation checks, with commands/results
 - [ ] Authorization and sensitive-data handling reviewed where affected
