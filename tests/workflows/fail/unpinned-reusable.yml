@@ -1,0 +1,8 @@
+# expect: pinned-action
+name: x
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  a:
+    uses: ERP-02/.github/.github/workflows/docs.yml@master

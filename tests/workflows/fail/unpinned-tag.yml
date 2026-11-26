@@ -1,0 +1,10 @@
+# expect: pinned-action
+name: x
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  a:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
