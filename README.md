@@ -14,6 +14,10 @@ Prefer a sibling checkout for local work; otherwise fetch the public source and 
 
 Keep internal service designs and private data in `documentation`. The shared rules do not install tools, grant permissions or approve architecture decisions.
 
+## Templates and security
+
+Issue forms in `ISSUE_TEMPLATE/` (epic, task, bug, architecture decision) and the [pull request template](pull_request_template.md) are the organization defaults; blank issues are disabled. Vulnerabilities are reported privately as described in [SECURITY.md](SECURITY.md); private vulnerability reporting is enabled on this repository as the fallback route.
+
 ## Parent workspace entrypoint
 
 Versioned [workspace AGENTS.md](workspace/AGENTS.md) and [Claude adapter](workspace/CLAUDE.md) provide the sibling-repository map and the owner-configured single-agent Ready queue. Copy them to the parent workspace without overwriting existing files; see `documentation/standards/ready-issue-workflow.md` in the local architecture checkout for setup and live Project/dependency handling. The parent folder does not become a monorepo.

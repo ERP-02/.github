@@ -1,0 +1,75 @@
+name: Epic
+description: A large deliverable inside one owning repository, broken into reviewable tasks
+title: "[EPIC] "
+labels: ["type:epic"]
+body:
+  - type: dropdown
+    id: owner
+    attributes:
+      label: Owner repository
+      description: The repository that owns this work.
+      options:
+        - erp
+        - identity-service
+        - infrastructure
+        - integration-hub
+        - reporting-engine
+        - documentation
+        - developer-tools
+        - shared-libraries
+        - .github
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      placeholder: "Example: Partial and full sales returns with credit notes, stock re-entry and receivable relief."
+    validations:
+      required: true
+  - type: textarea
+    id: ownership
+    attributes:
+      label: Owned / not owned
+      description: What this repository owns for the epic, and what stays with other repositories.
+      placeholder: |
+        Owned: credit note records, posting rules, return receipts.
+        Not owned: e-document transmission (integration-hub), user roles (identity-service).
+    validations:
+      required: true
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables and acceptance criteria
+      description: The outcomes that let the epic close. Each one is covered by a child task.
+      placeholder: |
+        - [ ] Credit note API and UI with four-eyes approval.
+        - [ ] Ledger and stock reconcile after a return (integration tests).
+    validations:
+      required: true
+  - type: textarea
+    id: tasks
+    attributes:
+      label: Child tasks and dependencies
+      description: Add tasks as native sub-issues; link blocking issues in other repositories as "blocked by".
+      placeholder: "Sub-issues: #NN credit notes, #NN return receipts. Blocked by ERP-02/documentation#NN (decision)."
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Required cross-cutting checks
+      options:
+        - label: Security and authorization reviewed; no credentials committed.
+        - label: Tenant/company isolation addressed where relevant.
+        - label: Validation, errors, concurrency and idempotency specified.
+        - label: Compatibility/versioning and migration strategy documented.
+        - label: Unit/integration/contract tests and negative cases included.
+        - label: Logs/metrics/traces and operational failure modes defined.
+        - label: Documentation and example usage provided.
+        - label: Dependencies on other repositories explicitly linked; no scope leakage.
+  - type: textarea
+    id: completion
+    attributes:
+      label: Completion rule
+      value: Close only when every deliverable links its acceptance evidence (merged PRs, tests, docs/ADRs), or mark the epic planning-only with approved child tasks.
+    validations:
+      required: true
